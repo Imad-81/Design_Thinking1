@@ -1,0 +1,55 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="0%" r="70%">
+      <stop offset="0%" stop-color="#1d4ed8" stop-opacity="0.45" />
+      <stop offset="40%" stop-color="#0f172a" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#020617" stop-opacity="0.0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="1920" height="1080" fill="#020617" />
+
+  <!-- soft glow at top center -->
+  <ellipse cx="960" cy="-120" rx="900" ry="500" fill="url(#glow)" />
+
+  <!-- random stars -->
+  <g fill="#e5e7eb" fill-opacity="0.9">
+    <circle cx="120" cy="160" r="1.4" />
+    <circle cx="300" cy="80" r="1.2" />
+    <circle cx="520" cy="220" r="1.1" />
+    <circle cx="780" cy="140" r="1.5" />
+    <circle cx="1020" cy="60" r="1.3" />
+    <circle cx="1320" cy="190" r="1.1" />
+    <circle cx="1550" cy="90" r="1.4" />
+    <circle cx="1780" cy="210" r="1.2" />
+
+    <circle cx="200" cy="360" r="1.2" />
+    <circle cx="420" cy="420" r="1.6" />
+    <circle cx="650" cy="340" r="1.3" />
+    <circle cx="900" cy="380" r="1.1" />
+    <circle cx="1180" cy="330" r="1.5" />
+    <circle cx="1450" cy="410" r="1.2" />
+    <circle cx="1700" cy="360" r="1.3" />
+
+    <circle cx="260" cy="620" r="1.3" />
+    <circle cx="540" cy="690" r="1.1" />
+    <circle cx="800" cy="640" r="1.4" />
+    <circle cx="1080" cy="700" r="1.2" />
+    <circle cx="1340" cy="660" r="1.5" />
+    <circle cx="1600" cy="720" r="1.2" />
+
+    <circle cx="320" cy="900" r="1.1" />
+    <circle cx="620" cy="840" r="1.3" />
+    <circle cx="940" cy="920" r="1.4" />
+    <circle cx="1260" cy="860" r="1.2" />
+    <circle cx="1580" cy="930" r="1.3" />
+  </g>
+
+  <!-- a few bigger 'hero' stars -->
+  <g fill="#facc15">
+    <circle cx="260" cy="260" r="2" />
+    <circle cx="1150" cy="200" r="2.2" />
+    <circle cx="1480" cy="520" r="2" />
+    <circle cx="780" cy="780" r="2.1" />
+  </g>
+</svg>
