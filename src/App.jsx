@@ -280,45 +280,36 @@ function MainApp({
   const [filterPrice, setFilterPrice] = useState("All");
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Handle filter params from dashboard card clicks
+  // Handle query params coming from dashboard shortcuts or direct links.
+  // We treat query params as route-scoped filters and never mutate the master task list.
   useEffect(() => {
-    const filter = searchParams.get("filter");
-    if (filter === "postedByMe") {
+    const viewParam = searchParams.get("view");
+    if (viewParam === "posted") {
+      // Dashboard shortcut: show tasks posted by current user (one-time scoped filter)
       setView("marketplace");
       setFilterCategory("All");
       setFilterPrice("All");
-      setSearchParams({ postedBy: "me" });
-    } else if (filter === "acceptedByMe") {
-      setView("my-tasks");
-      setSearchParams({});
-    } else if (filter === "completed") {
+      // keep searchParams as-is (contains view=posted) so filtered view is derivable from URL
+    } else if (searchParams.get("completed") === "true") {
       setView("history");
-      setSearchParams({ completed: "true" });
-    } else if (filter === "open") {
+    } else if (viewParam === "open" || searchParams.get("status") === "open") {
       setView("marketplace");
       setFilterCategory("All");
       setFilterPrice("All");
-      setSearchParams({ status: "open" });
     }
-  }, [searchParams, setSearchParams]);
+    // No other action: if there are no relevant params, we don't mutate tasks or persist filters.
+  }, [searchParams]);
 
-  // Filter tasks for Browse Tasks - show ALL open tasks including user's own
+  // Derived filtering for Browse Tasks. Do not mutate `tasks`.
   const filteredTasks = tasks.filter((t) => {
-    // Check if we're filtering by posted by me
-    const postedByMe = searchParams.get("postedBy") === "me";
-    if (postedByMe) {
-      // Only show tasks created by current user
+    const viewParam = searchParams.get("view");
+
+    if (viewParam === "posted") {
+      // One-time scoped filter: only tasks created by current user
       if (t.createdBy !== currentUser.id) return false;
     } else {
-      // Check if filtering by status
-      const statusFilter = searchParams.get("status");
-      if (statusFilter === "open") {
-        // Show all open tasks (including user's own)
-        if (t.status !== "open") return false;
-      } else {
-        // Default: show all open tasks (including user's own)
-        if (t.status !== "open") return false;
-      }
+      // Default marketplace behaviour: show only open tasks
+      if (t.status !== "open") return false;
     }
 
     const catOk = filterCategory === "All" || t.category === filterCategory;
@@ -335,7 +326,13 @@ function MainApp({
     <div className="app">
       <Sidebar
         currentView={view}
-        onChangeView={setView}
+        onChangeView={(v) => {
+          setView(v);
+          // If user navigates to Browse Tasks from the sidebar, clear any route-scoped filters
+          if (v === "marketplace") {
+            setSearchParams({});
+          }
+        }}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
@@ -371,6 +368,8 @@ function MainApp({
             onOpenTask={setSelectedTask}
             currentUser={currentUser}
             onNavigateToMyTasks={() => setView("my-tasks")}
+            searchParams={searchParams}
+            onClearFilters={() => setSearchParams({})}
           />
         )}
 
@@ -772,7 +771,7 @@ function Dashboard({ tasks, currentUser, onCompleteTask, onNavigate }) {
       <div className="stats-row">
         <button
           className="stat-card clickable"
-          onClick={() => onNavigate("marketplace", { postedBy: "me" })}
+          onClick={() => onNavigate("marketplace", { view: "posted" })}
         >
           <div className="stat-label">Tasks posted</div>
           <div className="stat-value">{totalPosted}</div>
@@ -793,7 +792,7 @@ function Dashboard({ tasks, currentUser, onCompleteTask, onNavigate }) {
         </button>
         <button
           className="stat-card clickable"
-          onClick={() => onNavigate("marketplace", { status: "open" })}
+          onClick={() => onNavigate("marketplace", { view: "open" })}
         >
           <div className="stat-label">Pending right now</div>
           <div className="stat-value">{pendingTotal}</div>
@@ -1086,6 +1085,8 @@ function TaskMarketplace({
   onOpenTask,
   currentUser,
   onNavigateToMyTasks,
+  searchParams,
+  onClearFilters,
 }) {
   return (
     <section className="section">
@@ -1099,6 +1100,15 @@ function TaskMarketplace({
         </div>
 
         <div className="filters">
+            {searchParams?.get("view") && (
+              <button
+                className="secondary-btn small"
+                onClick={() => onClearFilters && onClearFilters()}
+                style={{ marginRight: "0.6rem" }}
+              >
+                Clear filter
+              </button>
+            )}
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
