@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { Routes, Route, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import {
   FiHome,
   FiList,
@@ -9,8 +10,10 @@ import {
   FiMenu,
   FiTarget,
 } from "react-icons/fi";
+import { signup, login, logout, getCurrentUser, isAuthenticated, updateUserBio } from "./services/mockAuthService";
 
 // ----- MOCK DATA -----
+// Initial tasks with mock user IDs (negative to avoid conflicts with real user IDs)
 const initialTasks = [
   {
     id: 1,
@@ -19,7 +22,8 @@ const initialTasks = [
     category: "Coding / Assignments",
     price: 150,
     deadline: "Today, 11:00 PM",
-    createdBy: "Alex Kumar",
+    createdBy: "-1", // mock user ID
+    createdByName: "Alex Kumar",
     acceptedBy: null,
     status: "open",
   },
@@ -30,7 +34,8 @@ const initialTasks = [
     category: "Notes / Study Material",
     price: 80,
     deadline: "Tomorrow, 9:00 AM",
-    createdBy: "Priya Sharma",
+    createdBy: "-2",
+    createdByName: "Priya Sharma",
     acceptedBy: null,
     status: "open",
   },
@@ -41,7 +46,8 @@ const initialTasks = [
     category: "Concept Explanation",
     price: 120,
     deadline: "Tonight, 10:30 PM",
-    createdBy: "Rahul Singh",
+    createdBy: "-3",
+    createdByName: "Rahul Singh",
     acceptedBy: null,
     status: "open",
   },
@@ -52,8 +58,10 @@ const initialTasks = [
     category: "Lab Work",
     price: 100,
     deadline: "Yesterday, 5:00 PM",
-    createdBy: "Sam Wilson",
-    acceptedBy: "Alex Kumar",
+    createdBy: "-4",
+    createdByName: "Sam Wilson",
+    acceptedBy: "-1",
+    acceptedByName: "Alex Kumar",
     status: "completed",
   },
   {
@@ -63,8 +71,10 @@ const initialTasks = [
     category: "Coding / Assignments",
     price: 200,
     deadline: "Last week",
-    createdBy: "Maya Patel",
-    acceptedBy: "Priya Sharma",
+    createdBy: "-5",
+    createdByName: "Maya Patel",
+    acceptedBy: "-2",
+    acceptedByName: "Priya Sharma",
     status: "completed",
   },
   {
@@ -74,7 +84,8 @@ const initialTasks = [
     category: "Random / Other",
     price: 90,
     deadline: "Tomorrow, 2:00 PM",
-    createdBy: "Neha Verma",
+    createdBy: "-6",
+    createdByName: "Neha Verma",
     acceptedBy: null,
     status: "open",
   },
@@ -85,7 +96,8 @@ const initialTasks = [
     category: "Random / Other",
     price: 110,
     deadline: "Today, 8:00 PM",
-    createdBy: "Neha Verma",
+    createdBy: "-6",
+    createdByName: "Neha Verma",
     acceptedBy: null,
     status: "open",
   },
@@ -94,30 +106,54 @@ const initialTasks = [
 // ----- MAIN APP -----
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [view, setView] = useState("dashboard");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [tasks, setTasks] = useState(initialTasks);
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [filterCategory, setFilterCategory] = useState("All");
-  const [filterPrice, setFilterPrice] = useState("All");
+  const [tasks, setTasks] = useState(() => {
+    const saved = localStorage.getItem("campusTasks_tasks");
+    return saved ? JSON.parse(saved) : initialTasks;
+  });
+
+  useEffect(() => {
+    // Load current user from localStorage on mount
+    const user = getCurrentUser();
+    if (user) {
+      setCurrentUser(user);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Save tasks to localStorage whenever they change
+    localStorage.setItem("campusTasks_tasks", JSON.stringify(tasks));
+  }, [tasks]);
 
   const handleCreateTask = (taskData) => {
     const newTask = {
       id: Date.now(),
       ...taskData,
-      createdBy: currentUser.name,
+      createdBy: currentUser.id,
+      createdByName: currentUser.name,
       acceptedBy: null,
       status: "open",
     };
     setTasks((prev) => [newTask, ...prev]);
-    setView("marketplace");
   };
 
   const handleAcceptTask = (taskId) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    // Prevent users from accepting their own tasks
+    if (task.createdBy === currentUser.id) {
+      return;
+    }
+
     setTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
-          ? { ...t, acceptedBy: currentUser.name, status: "accepted" }
+          ? {
+              ...t,
+              acceptedBy: currentUser.id,
+              acceptedByName: currentUser.name,
+              status: "accepted",
+            }
           : t
       )
     );
@@ -125,10 +161,13 @@ export default function App() {
 
   const handleCompleteTask = (taskId) => {
     setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId ? { ...t, status: "completed" } : t
-      )
+      prev.map((t) => (t.id === taskId ? { ...t, status: "completed" } : t))
     );
+  };
+
+  const handleLogout = () => {
+    logout();
+    setCurrentUser(null);
   };
 
   const categories = [
@@ -140,8 +179,147 @@ export default function App() {
     "Random / Other",
   ];
 
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          currentUser ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <LoginPage
+              onLogin={(user) => {
+                setCurrentUser(user);
+              }}
+            />
+          )
+        }
+      />
+      <Route
+        path="/signup"
+        element={
+          currentUser ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <SignupPage
+              onSignup={(user) => {
+                setCurrentUser(user);
+              }}
+            />
+          )
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute currentUser={currentUser}>
+            <MainApp
+              currentUser={currentUser}
+              tasks={tasks}
+              categories={categories}
+              onCreateTask={handleCreateTask}
+              onAcceptTask={handleAcceptTask}
+              onCompleteTask={handleCompleteTask}
+              onLogout={handleLogout}
+            />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute currentUser={currentUser}>
+            <MainApp
+              currentUser={currentUser}
+              tasks={tasks}
+              categories={categories}
+              onCreateTask={handleCreateTask}
+              onAcceptTask={handleAcceptTask}
+              onCompleteTask={handleCompleteTask}
+              onLogout={handleLogout}
+            />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/"
+        element={
+          currentUser ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+    </Routes>
+  );
+}
+
+// ----- PROTECTED ROUTE -----
+function ProtectedRoute({ children, currentUser }) {
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
+
+// ----- MAIN APP LAYOUT -----
+function MainApp({
+  currentUser,
+  tasks,
+  categories,
+  onCreateTask,
+  onAcceptTask,
+  onCompleteTask,
+  onLogout,
+}) {
+  const [view, setView] = useState("dashboard");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [filterCategory, setFilterCategory] = useState("All");
+  const [filterPrice, setFilterPrice] = useState("All");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Handle filter params from dashboard card clicks
+  useEffect(() => {
+    const filter = searchParams.get("filter");
+    if (filter === "postedByMe") {
+      setView("marketplace");
+      setFilterCategory("All");
+      setFilterPrice("All");
+      setSearchParams({ postedBy: "me" });
+    } else if (filter === "acceptedByMe") {
+      setView("my-tasks");
+      setSearchParams({});
+    } else if (filter === "completed") {
+      setView("history");
+      setSearchParams({ completed: "true" });
+    } else if (filter === "open") {
+      setView("marketplace");
+      setFilterCategory("All");
+      setFilterPrice("All");
+      setSearchParams({ status: "open" });
+    }
+  }, [searchParams, setSearchParams]);
+
+  // Filter tasks for Browse Tasks - show ALL open tasks including user's own
   const filteredTasks = tasks.filter((t) => {
-    if (t.status !== "open" && t.acceptedBy !== currentUser?.name) return false;
+    // Check if we're filtering by posted by me
+    const postedByMe = searchParams.get("postedBy") === "me";
+    if (postedByMe) {
+      // Only show tasks created by current user
+      if (t.createdBy !== currentUser.id) return false;
+    } else {
+      // Check if filtering by status
+      const statusFilter = searchParams.get("status");
+      if (statusFilter === "open") {
+        // Show all open tasks (including user's own)
+        if (t.status !== "open") return false;
+      } else {
+        // Default: show all open tasks (including user's own)
+        if (t.status !== "open") return false;
+      }
+    }
 
     const catOk = filterCategory === "All" || t.category === filterCategory;
 
@@ -152,18 +330,6 @@ export default function App() {
 
     return catOk && priceOk;
   });
-
-  // Show auth screen if not logged in
-  if (!currentUser) {
-    return (
-      <AuthScreen
-        onLogin={(user) => {
-          setCurrentUser(user);
-          setView("dashboard");
-        }}
-      />
-    );
-  }
 
   return (
     <div className="app">
@@ -179,7 +345,17 @@ export default function App() {
           <Dashboard
             tasks={tasks}
             currentUser={currentUser}
-            onCompleteTask={handleCompleteTask}
+            onCompleteTask={onCompleteTask}
+            onNavigate={(viewName, params) => {
+              setView(viewName);
+              if (params) {
+                const newParams = new URLSearchParams();
+                Object.entries(params).forEach(([key, value]) => {
+                  newParams.set(key, value);
+                });
+                setSearchParams(newParams);
+              }
+            }}
           />
         )}
 
@@ -191,26 +367,34 @@ export default function App() {
             setFilterCategory={setFilterCategory}
             filterPrice={filterPrice}
             setFilterPrice={setFilterPrice}
-            onAcceptTask={handleAcceptTask}
+            onAcceptTask={onAcceptTask}
             onOpenTask={setSelectedTask}
+            currentUser={currentUser}
+            onNavigateToMyTasks={() => setView("my-tasks")}
           />
         )}
 
         {view === "post" && (
-          <PostTaskForm
-            onCreateTask={handleCreateTask}
-            categories={categories}
+          <PostTaskForm onCreateTask={onCreateTask} categories={categories} />
+        )}
+
+        {view === "my-tasks" && (
+          <MyAcceptedTasks
+            tasks={tasks}
+            currentUser={currentUser}
+            onCompleteTask={onCompleteTask}
+            onOpenTask={setSelectedTask}
           />
         )}
 
         {view === "history" && (
-          <History tasks={tasks} currentUser={currentUser} />
+          <History tasks={tasks} currentUser={currentUser} searchParams={searchParams} />
         )}
 
         {view === "profile" && (
           <Profile
             currentUser={currentUser}
-            onLogout={() => setCurrentUser(null)}
+            onLogout={onLogout}
             tasks={tasks}
           />
         )}
@@ -220,28 +404,37 @@ export default function App() {
         <TaskDetailsModal
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
-          onAcceptTask={handleAcceptTask}
+          onAcceptTask={onAcceptTask}
+          currentUser={currentUser}
         />
       )}
     </div>
   );
 }
 
-// ----- AUTH SCREEN -----
-function AuthScreen({ onLogin }) {
-  const [name, setName] = useState("");
-  const [campus, setCampus] = useState("Woxsen University");
-  const [role, setRole] = useState("earn");
+// ----- LOGIN PAGE -----
+function LoginPage({ onLogin }) {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    setError("");
+    setLoading(true);
 
-    onLogin({
-      name: name.trim(),
-      campus: campus.trim() || "Woxsen University",
-      role: role,
-    });
+    const result = login({ email, password });
+
+    if (result.success) {
+      onLogin(result.user);
+      navigate("/dashboard", { replace: true });
+    } else {
+      setError(result.error);
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -251,73 +444,240 @@ function AuthScreen({ onLogin }) {
           <span className="logo-icon-wrapper">
             <FiTarget className="logo-icon" />
           </span>
-          <h1>Welcome to CampusTasks</h1>
+          <h1>Welcome back</h1>
           <p className="auth-subtitle">
-            A student-to-student micro-task marketplace for your university.
+            Sign in to your CampusTasks account
           </p>
         </div>
 
         <form className="form" onSubmit={handleSubmit}>
+          {error && <div className="form-error">{error}</div>}
+
           <label className="form-label">
-            Name
+            Email
             <input
-              type="text"
-              placeholder="Enter your name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              type="email"
+              placeholder="your.email@university.edu"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={loading}
             />
           </label>
 
           <label className="form-label">
-            Campus / University
+            Password
+            <input
+              type="password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={loading}
+              minLength={6}
+            />
+          </label>
+
+          <button type="submit" className="primary-btn" disabled={loading}>
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
+
+          <p className="auth-link-text">
+            Don't have an account?{" "}
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => navigate("/signup")}
+            >
+              Sign up
+            </button>
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ----- SIGNUP PAGE -----
+function SignupPage({ onSignup }) {
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+
+  const validateName = (value) => {
+    if (!value.trim()) {
+      return "Name is required";
+    }
+    if (!/^[A-Za-z ]+$/.test(value.trim())) {
+      return "Name must contain only letters and spaces";
+    }
+    return "";
+  };
+
+  const validatePassword = (value) => {
+    if (value.length < 6) {
+      return "Password must be at least 6 characters";
+    }
+    return "";
+  };
+
+  const handleNameChange = (e) => {
+    const value = e.target.value;
+    setName(value);
+    if (errors.name) {
+      setErrors((prev) => ({ ...prev, name: validateName(value) }));
+    }
+  };
+
+  const handlePasswordChange = (e) => {
+    const value = e.target.value;
+    setPassword(value);
+    if (errors.password) {
+      setErrors((prev) => ({ ...prev, password: validatePassword(value) }));
+    }
+    if (errors.confirmPassword && confirmPassword) {
+      setErrors((prev) => ({
+        ...prev,
+        confirmPassword: value !== confirmPassword ? "Passwords do not match" : "",
+      }));
+    }
+  };
+
+  const handleConfirmPasswordChange = (e) => {
+    const value = e.target.value;
+    setConfirmPassword(value);
+    if (errors.confirmPassword) {
+      setErrors((prev) => ({
+        ...prev,
+        confirmPassword: value !== password ? "Passwords do not match" : "",
+      }));
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrors({});
+
+    const nameError = validateName(name);
+    const passwordError = validatePassword(password);
+    const confirmPasswordError =
+      password !== confirmPassword ? "Passwords do not match" : "";
+
+    if (nameError || passwordError || confirmPasswordError) {
+      setErrors({
+        name: nameError,
+        password: passwordError,
+        confirmPassword: confirmPasswordError,
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    const result = signup({ name, email, password });
+
+    if (result.success) {
+      onSignup(result.user);
+      navigate("/dashboard", { replace: true });
+    } else {
+      setErrors({ submit: result.error });
+    }
+
+    setLoading(false);
+  };
+
+  return (
+    <div className="auth-screen">
+      <div className="auth-card">
+        <div className="auth-header">
+          <span className="logo-icon-wrapper">
+            <FiTarget className="logo-icon" />
+          </span>
+          <h1>Create an account</h1>
+          <p className="auth-subtitle">
+            Join CampusTasks and start connecting with students
+          </p>
+        </div>
+
+        <form className="form" onSubmit={handleSubmit}>
+          {errors.submit && <div className="form-error">{errors.submit}</div>}
+
+          <label className="form-label">
+            Full Name
             <input
               type="text"
-              placeholder="Your university name"
-              value={campus}
-              onChange={(e) => setCampus(e.target.value)}
+              placeholder="John Doe"
+              value={name}
+              onChange={handleNameChange}
+              required
+              disabled={loading}
+              pattern="[A-Za-z ]+"
+            />
+            {errors.name && <span className="field-error">{errors.name}</span>}
+          </label>
+
+          <label className="form-label">
+            Email
+            <input
+              type="email"
+              placeholder="your.email@university.edu"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={loading}
             />
           </label>
 
           <label className="form-label">
-            Role
-            <div className="radio-group">
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="role"
-                  value="earn"
-                  checked={role === "earn"}
-                  onChange={(e) => setRole(e.target.value)}
-                />
-                <span>I want to earn by doing tasks</span>
-              </label>
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="role"
-                  value="post"
-                  checked={role === "post"}
-                  onChange={(e) => setRole(e.target.value)}
-                />
-                <span>I mostly want to post tasks</span>
-              </label>
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="role"
-                  value="both"
-                  checked={role === "both"}
-                  onChange={(e) => setRole(e.target.value)}
-                />
-                <span>I want to do both</span>
-              </label>
-            </div>
+            Password
+            <input
+              type="password"
+              placeholder="At least 6 characters"
+              value={password}
+              onChange={handlePasswordChange}
+              required
+              disabled={loading}
+              minLength={6}
+            />
+            {errors.password && (
+              <span className="field-error">{errors.password}</span>
+            )}
           </label>
 
-          <button type="submit" className="primary-btn">
-            Continue to dashboard
+          <label className="form-label">
+            Confirm Password
+            <input
+              type="password"
+              placeholder="Re-enter your password"
+              value={confirmPassword}
+              onChange={handleConfirmPasswordChange}
+              required
+              disabled={loading}
+              minLength={6}
+            />
+            {errors.confirmPassword && (
+              <span className="field-error">{errors.confirmPassword}</span>
+            )}
+          </label>
+
+          <button type="submit" className="primary-btn" disabled={loading}>
+            {loading ? "Creating account..." : "Create account"}
           </button>
+
+          <p className="auth-link-text">
+            Already have an account?{" "}
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => navigate("/login")}
+            >
+              Log in
+            </button>
+          </p>
         </form>
       </div>
     </div>
@@ -387,15 +747,15 @@ function Sidebar({ currentView, onChangeView, collapsed, onToggleCollapse }) {
 }
 
 // ----- DASHBOARD -----
-function Dashboard({ tasks, currentUser, onCompleteTask }) {
-  const postedByUser = tasks.filter((t) => t.createdBy === currentUser.name);
-  const acceptedByUser = tasks.filter((t) => t.acceptedBy === currentUser.name);
+function Dashboard({ tasks, currentUser, onCompleteTask, onNavigate }) {
+  const postedByUser = tasks.filter((t) => t.createdBy === currentUser.id);
+  const acceptedByUser = tasks.filter((t) => t.acceptedBy === currentUser.id);
   const totalPosted = postedByUser.length;
   const totalAccepted = acceptedByUser.length;
   const totalCompleted = tasks.filter(
     (t) =>
       t.status === "completed" &&
-      (t.acceptedBy === currentUser.name || t.createdBy === currentUser.name)
+      (t.acceptedBy === currentUser.id || t.createdBy === currentUser.id)
   ).length;
   const pendingOutgoing = postedByUser.filter((t) => t.status === "open").length;
   const pendingIncoming = acceptedByUser.filter(
@@ -410,19 +770,31 @@ function Dashboard({ tasks, currentUser, onCompleteTask }) {
       <h1>Dashboard</h1>
 
       <div className="stats-row">
-        <div className="stat-card">
+        <button
+          className="stat-card clickable"
+          onClick={() => onNavigate("marketplace", { postedBy: "me" })}
+        >
           <div className="stat-label">Tasks posted</div>
           <div className="stat-value">{totalPosted}</div>
-        </div>
-        <div className="stat-card">
+        </button>
+        <button
+          className="stat-card clickable"
+          onClick={() => onNavigate("my-tasks")}
+        >
           <div className="stat-label">Tasks accepted by you</div>
           <div className="stat-value">{totalAccepted}</div>
-        </div>
-        <div className="stat-card">
+        </button>
+        <button
+          className="stat-card clickable"
+          onClick={() => onNavigate("history", { completed: "true" })}
+        >
           <div className="stat-label">Tasks completed</div>
           <div className="stat-value">{totalCompleted}</div>
-        </div>
-        <div className="stat-card">
+        </button>
+        <button
+          className="stat-card clickable"
+          onClick={() => onNavigate("marketplace", { status: "open" })}
+        >
           <div className="stat-label">Pending right now</div>
           <div className="stat-value">{pendingTotal}</div>
           {pendingTotal > 0 && (
@@ -430,7 +802,7 @@ function Dashboard({ tasks, currentUser, onCompleteTask }) {
               {pendingOutgoing} outgoing, {pendingIncoming} incoming
             </div>
           )}
-        </div>
+        </button>
       </div>
 
       <div className="dashboard-columns">
@@ -492,9 +864,9 @@ function Dashboard({ tasks, currentUser, onCompleteTask }) {
                     <span className="pill pill-price">₹{task.price}</span>
                     <span className="deadline">Deadline: {task.deadline}</span>
                   </div>
-                  {task.acceptedBy && (
+                  {task.acceptedByName && (
                     <p className="muted" style={{ fontSize: "0.8rem" }}>
-                      Accepted by: {task.acceptedBy}
+                      Accepted by: {task.acceptedByName}
                     </p>
                   )}
                 </div>
@@ -509,11 +881,14 @@ function Dashboard({ tasks, currentUser, onCompleteTask }) {
 
 // ----- POST TASK FORM -----
 function PostTaskForm({ onCreateTask, categories }) {
+  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Coding / Assignments");
   const [price, setPrice] = useState(100);
   const [deadline, setDeadline] = useState("");
+
+  const pricePresets = [50, 100, 200, 500];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -531,6 +906,7 @@ function PostTaskForm({ onCreateTask, categories }) {
     setDescription("");
     setPrice(100);
     setDeadline("");
+    // Task created, user can see it in marketplace or dashboard
   };
 
   return (
@@ -582,13 +958,41 @@ function PostTaskForm({ onCreateTask, categories }) {
 
             <label className="form-label">
               Price (₹)
-              <input
-                type="number"
-                min={10}
-                step={10}
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-              />
+              <div className="price-selector">
+                <input
+                  type="range"
+                  min="50"
+                  max="1000"
+                  step="10"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="price-slider"
+                />
+                <div className="price-display">
+                  <span className="price-currency">₹</span>
+                  <input
+                    type="number"
+                    min="50"
+                    max="1000"
+                    step="10"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className="price-input"
+                  />
+                </div>
+              </div>
+              <div className="price-presets">
+                {pricePresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={`price-preset-btn ${price == preset ? "active" : ""}`}
+                    onClick={() => setPrice(preset)}
+                  >
+                    ₹{preset}
+                  </button>
+                ))}
+              </div>
             </label>
           </div>
 
@@ -611,6 +1015,65 @@ function PostTaskForm({ onCreateTask, categories }) {
   );
 }
 
+// ----- MY ACCEPTED TASKS -----
+function MyAcceptedTasks({ tasks, currentUser, onCompleteTask, onOpenTask }) {
+  const acceptedTasks = tasks.filter(
+    (t) => t.acceptedBy === currentUser.id && t.status === "accepted"
+  );
+
+  return (
+    <section className="section">
+      <h1>My Accepted Tasks</h1>
+      <p className="muted">
+        Tasks you've accepted and are currently working on. Mark them as completed when done.
+      </p>
+
+      {acceptedTasks.length === 0 ? (
+        <div className="card">
+          <p className="muted">You haven't accepted any tasks yet.</p>
+          <p className="muted" style={{ marginTop: "0.5rem" }}>
+            Go to Browse Tasks to find opportunities to earn.
+          </p>
+        </div>
+      ) : (
+        <div className="task-grid">
+          {acceptedTasks.map((task) => (
+            <article key={task.id} className="task-card">
+              <div className="task-card-header">
+                <h3
+                  className="task-title"
+                  onClick={() => onOpenTask(task)}
+                >
+                  {task.title}
+                </h3>
+                <span className="status-pill status-accepted">Accepted</span>
+              </div>
+              <p className="task-description">{task.description}</p>
+              <div className="task-meta">
+                <span className="pill">{task.category}</span>
+                <span className="pill pill-price">₹{task.price}</span>
+              </div>
+              <div className="task-footer">
+                <span className="deadline">Deadline: {task.deadline}</span>
+                <span className="muted" style={{ fontSize: "0.8rem" }}>
+                  Posted by {task.createdByName || task.createdBy}
+                </span>
+              </div>
+              <button
+                className="primary-btn small"
+                onClick={() => onCompleteTask(task.id)}
+                style={{ marginTop: "0.75rem" }}
+              >
+                Mark as completed
+              </button>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ----- TASK MARKETPLACE -----
 function TaskMarketplace({
   tasks,
@@ -621,6 +1084,8 @@ function TaskMarketplace({
   setFilterPrice,
   onAcceptTask,
   onOpenTask,
+  currentUser,
+  onNavigateToMyTasks,
 }) {
   return (
     <section className="section">
@@ -659,34 +1124,70 @@ function TaskMarketplace({
         <p className="muted">No tasks match these filters right now.</p>
       ) : (
         <div className="task-grid">
-          {tasks.map((task) => (
-            <article key={task.id} className="task-card">
-              <h3
-                className="task-title"
-                onClick={() => onOpenTask(task)}
-              >
-                {task.title}
-              </h3>
-              <p className="task-description">
-                {task.description.slice(0, 120)}
-                {task.description.length > 120 ? "…" : ""}
-              </p>
-              <div className="task-meta">
-                <span className="pill">{task.category}</span>
-                <span className="pill pill-price">₹{task.price}</span>
-              </div>
-              <div className="task-footer">
-                <span className="deadline">Deadline: {task.deadline}</span>
-                <button
-                  className="primary-btn small"
-                  onClick={() => onAcceptTask(task.id)}
-                  disabled={task.acceptedBy}
-                >
-                  {task.acceptedBy ? "Already accepted" : "Accept task"}
-                </button>
-              </div>
-            </article>
-          ))}
+          {tasks.map((task) => {
+            const isOwnTask = task.createdBy === currentUser.id;
+            const isAccepted = task.acceptedBy !== null;
+            const isAcceptedByMe = task.acceptedBy === currentUser.id;
+
+            return (
+              <article key={task.id} className="task-card">
+                <div className="task-card-header">
+                  <h3
+                    className="task-title"
+                    onClick={() => {
+                      if (isAcceptedByMe && onNavigateToMyTasks) {
+                        onNavigateToMyTasks();
+                      } else {
+                        onOpenTask(task);
+                      }
+                    }}
+                  >
+                    {task.title}
+                  </h3>
+                  <div className="task-badges">
+                    {isOwnTask && (
+                      <span className="task-badge posted-by-you">Posted by you</span>
+                    )}
+                    {isAccepted && !isOwnTask && !isAcceptedByMe && (
+                      <span className="task-badge taken">Taken</span>
+                    )}
+                    {isAcceptedByMe && (
+                      <span className="task-badge accepted-by-me">Accepted</span>
+                    )}
+                  </div>
+                </div>
+                <p className="task-description">
+                  {task.description.slice(0, 120)}
+                  {task.description.length > 120 ? "…" : ""}
+                </p>
+                <div className="task-meta">
+                  <span className="pill">{task.category}</span>
+                  <span className="pill pill-price">₹{task.price}</span>
+                </div>
+                <div className="task-footer">
+                  <span className="deadline">Deadline: {task.deadline}</span>
+                  {isOwnTask ? (
+                    <span className="your-task-label">Your Task</span>
+                  ) : isAcceptedByMe ? (
+                    <button
+                      className="secondary-btn small"
+                      onClick={() => onNavigateToMyTasks && onNavigateToMyTasks()}
+                    >
+                      View in My Tasks
+                    </button>
+                  ) : (
+                    <button
+                      className="primary-btn small"
+                      onClick={() => onAcceptTask(task.id)}
+                      disabled={isAccepted}
+                    >
+                      {isAccepted ? "Already accepted" : "Accept task"}
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </section>
@@ -694,12 +1195,15 @@ function TaskMarketplace({
 }
 
 // ----- HISTORY -----
-function History({ tasks, currentUser }) {
+function History({ tasks, currentUser, searchParams }) {
+  // Filter to show only completed tasks if filter is set
+  const showCompletedOnly = searchParams?.get("completed") === "true";
+  
   const completedAccepted = tasks.filter(
-    (t) => t.status === "completed" && t.acceptedBy === currentUser.name
+    (t) => t.status === "completed" && t.acceptedBy === currentUser.id
   );
   const completedPosted = tasks.filter(
-    (t) => t.status === "completed" && t.createdBy === currentUser.name
+    (t) => t.status === "completed" && t.createdBy === currentUser.id
   );
   const allCompleted = [...completedAccepted, ...completedPosted].sort(
     (a, b) => b.id - a.id
@@ -708,7 +1212,11 @@ function History({ tasks, currentUser }) {
   return (
     <section className="section">
       <h2>History</h2>
-      <p className="muted">Completed tasks you accepted and posted.</p>
+      <p className="muted">
+        {showCompletedOnly
+          ? "Completed tasks you accepted and posted."
+          : "All completed tasks you accepted and posted."}
+      </p>
 
       {allCompleted.length === 0 ? (
         <p className="muted">No completed tasks yet.</p>
@@ -728,9 +1236,9 @@ function History({ tasks, currentUser }) {
               <div className="task-footer">
                 <span className="deadline">Deadline: {task.deadline}</span>
                 <span className="muted">
-                  {task.acceptedBy === currentUser.name
-                    ? `Posted by ${task.createdBy}`
-                    : `Accepted by ${task.acceptedBy}`}
+                  {task.acceptedBy === currentUser.id
+                    ? `Posted by ${task.createdByName}`
+                    : `Accepted by ${task.acceptedByName}`}
                 </span>
               </div>
             </article>
@@ -743,8 +1251,34 @@ function History({ tasks, currentUser }) {
 
 // ----- PROFILE -----
 function Profile({ currentUser, onLogout, tasks }) {
-  const posted = tasks.filter((t) => t.createdBy === currentUser.name);
-  const accepted = tasks.filter((t) => t.acceptedBy === currentUser.name);
+  const navigate = useNavigate();
+  const [bio, setBio] = useState(currentUser.bio || "");
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [bioError, setBioError] = useState("");
+
+  const posted = tasks.filter((t) => t.createdBy === currentUser.id);
+  const accepted = tasks.filter((t) => t.acceptedBy === currentUser.id);
+
+  const handleSaveBio = () => {
+    if (bio.length > 300) {
+      setBioError("Bio must be 300 characters or less");
+      return;
+    }
+    
+    // Update bio in localStorage via mockAuthService
+    updateUserBio(currentUser.id, bio);
+    setIsEditingBio(false);
+    setBioError("");
+    
+    // Update current user object
+    currentUser.bio = bio;
+  };
+
+  const handleCancelBio = () => {
+    setBio(currentUser.bio || "");
+    setIsEditingBio(false);
+    setBioError("");
+  };
 
   return (
     <section className="section">
@@ -758,19 +1292,64 @@ function Profile({ currentUser, onLogout, tasks }) {
           </div>
 
           <div className="profile-field">
-            <label className="form-label">Campus</label>
-            <div className="profile-value">{currentUser.campus}</div>
+            <label className="form-label">Email</label>
+            <div className="profile-value">{currentUser.email}</div>
           </div>
 
           <div className="profile-field">
-            <label className="form-label">Role</label>
-            <div className="profile-value">
-              {currentUser.role === "earn"
-                ? "I want to earn by doing tasks"
-                : currentUser.role === "post"
-                ? "I mostly want to post tasks"
-                : "I want to do both"}
+            <div className="profile-bio-header">
+              <label className="form-label">Bio</label>
+              {!isEditingBio && (
+                <button
+                  className="link-btn"
+                  onClick={() => setIsEditingBio(true)}
+                  style={{ fontSize: "0.85rem" }}
+                >
+                  Edit
+                </button>
+              )}
             </div>
+            {isEditingBio ? (
+              <div>
+                <textarea
+                  className="bio-textarea"
+                  value={bio}
+                  onChange={(e) => {
+                    setBio(e.target.value);
+                    if (bioError) setBioError("");
+                  }}
+                  placeholder="Tell others about yourself, your skills, and what you're good at..."
+                  maxLength={300}
+                  rows={4}
+                />
+                <div className="bio-char-count">
+                  {bio.length}/300 characters
+                </div>
+                {bioError && <span className="field-error">{bioError}</span>}
+                <div className="bio-actions">
+                  <button
+                    className="secondary-btn small"
+                    onClick={handleCancelBio}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="primary-btn small"
+                    onClick={handleSaveBio}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="profile-value profile-bio">
+                {bio || (
+                  <span className="muted" style={{ fontStyle: "italic" }}>
+                    No bio added yet. Click Edit to add one.
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -785,7 +1364,13 @@ function Profile({ currentUser, onLogout, tasks }) {
           </div>
         </div>
 
-        <button className="secondary-btn" onClick={onLogout}>
+        <button
+          className="secondary-btn"
+          onClick={() => {
+            onLogout();
+            navigate("/login", { replace: true });
+          }}
+        >
           Log out
         </button>
       </div>
@@ -794,7 +1379,10 @@ function Profile({ currentUser, onLogout, tasks }) {
 }
 
 // ----- TASK DETAILS MODAL -----
-function TaskDetailsModal({ task, onClose, onAcceptTask }) {
+function TaskDetailsModal({ task, onClose, onAcceptTask, currentUser }) {
+  const isOwnTask = task.createdBy === currentUser.id;
+  const isAccepted = task.acceptedBy !== null;
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
@@ -803,7 +1391,7 @@ function TaskDetailsModal({ task, onClose, onAcceptTask }) {
       >
         <h2>{task.title}</h2>
         <p className="muted">
-          Posted by <strong>{task.createdBy}</strong>
+          Posted by <strong>{task.createdByName || task.createdBy}</strong>
         </p>
 
         <p className="modal-description">{task.description}</p>
@@ -824,16 +1412,20 @@ function TaskDetailsModal({ task, onClose, onAcceptTask }) {
           <button className="secondary-btn" onClick={onClose}>
             Close
           </button>
-          <button
-            className="primary-btn"
-            disabled={task.acceptedBy}
-            onClick={() => {
-              onAcceptTask(task.id);
-              onClose();
-            }}
-          >
-            {task.acceptedBy ? "Already accepted" : "Accept this task"}
-          </button>
+          {isOwnTask ? (
+            <span className="your-task-label-large">Your Task</span>
+          ) : (
+            <button
+              className="primary-btn"
+              disabled={isAccepted}
+              onClick={() => {
+                onAcceptTask(task.id);
+                onClose();
+              }}
+            >
+              {isAccepted ? "Already accepted" : "Accept this task"}
+            </button>
+          )}
         </div>
       </div>
     </div>
