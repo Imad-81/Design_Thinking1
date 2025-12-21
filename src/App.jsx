@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { FiMessageCircle } from "react-icons/fi";
 import { Routes, Route, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import {
   FiHome,
@@ -122,6 +123,34 @@ const initialTasks = [
     status: "open",
   },
 ];
+
+// const mockChats = [
+//   {
+//     id: 1,
+//     taskId: 101,
+//     taskTitle: "Help with DSA assignment",
+//     otherUserName: "Rohan",
+//     messages: [
+//       { sender: "them", text: "Hey, I’ve accepted the task." },
+//       { sender: "me", text: "Great, deadline is tonight." },
+//     ],
+//     completedByMe: false,
+//     completedByThem: false,
+//   },
+//   {
+//     id: 2,
+//     taskId: 102,
+//     taskTitle: "Design PPT for presentation",
+//     otherUserName: "Ananya",
+//     messages: [
+//       { sender: "them", text: "Can you share the template?" },
+//       { sender: "me", text: "Sure, uploading soon." },
+//     ],
+//     completedByMe: false,
+//     completedByThem: false,
+//   },
+// ];
+
 
 // ----- MAIN APP -----
 export default function App() {
@@ -788,6 +817,10 @@ function Sidebar({ currentView, onChangeView, collapsed, onToggleCollapse }) {
     { id: "dashboard", label: "Dashboard", icon: FiHome },
     { id: "marketplace", label: "Browse Tasks", icon: FiList },
     { id: "post", label: "Post a Task", icon: FiPlusCircle },
+
+    // 🔽 NEW: Chats (task-based communication)
+    { id: "chats", label: "Chats", icon: FiMessageCircle },
+
     { id: "history", label: "History", icon: FiClock },
     { id: "leaderboard", label: "Leaderboard", icon: FiAward },
     { id: "profile", label: "Profile / Settings", icon: FiUser },
@@ -803,6 +836,7 @@ function Sidebar({ currentView, onChangeView, collapsed, onToggleCollapse }) {
         >
           <FiMenu />
         </button>
+
         {!collapsed && (
           <div className="sidebar-logo">
             <span className="logo-icon-wrapper">
@@ -819,12 +853,16 @@ function Sidebar({ currentView, onChangeView, collapsed, onToggleCollapse }) {
           return (
             <button
               key={item.id}
-              className={`sidebar-item ${currentView === item.id ? "active" : ""}`}
+              className={`sidebar-item ${
+                currentView === item.id ? "active" : ""
+              }`}
               onClick={() => onChangeView(item.id)}
               title={collapsed ? item.label : undefined}
             >
               <Icon className="sidebar-icon" />
-              {!collapsed && <span className="sidebar-label">{item.label}</span>}
+              {!collapsed && (
+                <span className="sidebar-label">{item.label}</span>
+              )}
             </button>
           );
         })}
@@ -844,6 +882,7 @@ function Sidebar({ currentView, onChangeView, collapsed, onToggleCollapse }) {
     </aside>
   );
 }
+
 
 // ----- DASHBOARD -----
 function Dashboard({ tasks, currentUser, onCompleteTask, onNavigate }) {
@@ -1715,3 +1754,4 @@ function TaskDetailsModal({ task, onClose, onAcceptTask, currentUser }) {
     </div>
   );
 }
+
