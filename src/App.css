@@ -40,3 +40,80 @@
 .read-the-docs {
   color: #888;
 }
+
+
+/* ===== Leaderboard (Card-per-user, spaced & polished) ===== */
+
+.leaderboard-section {
+  max-width: 640px;
+  margin: 0 auto;
+  padding-top: 1.25rem;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem; /* MORE SPACE BETWEEN CARDS */
+}
+
+.leaderboard-user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1.35rem; /* MORE INTERNAL BREATHING ROOM */
+}
+
+.leaderboard-user-left {
+  display: flex;
+  flex-direction: column; /* STACK RANK + NAME */
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.leaderboard-rank {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.leaderboard-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leaderboard-user-right {
+  display: flex;
+  align-items: center;
+}
+
+.leaderboard-score {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Subtle emphasis for #1 — calm, premium */
+.leaderboard-top {
+  border-left: 3px solid var(--primary-color);
+  padding-left: 1.15rem;
+}
+
+.task-grid {
+  overflow: visible;
+}
+
+.task-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  position: relative;
+}
+
+.task-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  z-index: 10;
+}
+

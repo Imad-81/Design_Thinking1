@@ -9,8 +9,28 @@ import {
   FiHelpCircle,
   FiMenu,
   FiTarget,
+  FiLogOut,
+  FiEdit2,
+  FiCheck,
+  FiX,
+  FiDollarSign,
+  FiTag,
+  FiCalendar,
+  FiSearch,
+  FiFilter,
+  FiChevronDown,
+  FiChevronUp,
+  FiAlertCircle,
+  FiAward,
 } from "react-icons/fi";
-import { signup, login, logout, getCurrentUser, isAuthenticated, updateUserBio } from "./services/mockAuthService";
+import {
+  signup,
+  login,
+  logout,
+  getCurrentUser,
+  isAuthenticated,
+  updateUserBio,
+} from "./services/mockAuthService";
 
 // ----- MOCK DATA -----
 // Initial tasks with mock user IDs (negative to avoid conflicts with real user IDs)
@@ -263,6 +283,83 @@ function ProtectedRoute({ children, currentUser }) {
   return children;
 }
 
+// Mock leaderboard data
+const leaderboardData = [
+  { id: "u1", name: "Aarav Sharma", completedTasks: 18 },
+  { id: "u2", name: "Neha Patel", completedTasks: 15 },
+  { id: "u3", name: "Rohan Mehta", completedTasks: 12 },
+  { id: "u4", name: "Simran Kaur", completedTasks: 9 },
+  { id: "u5", name: "Aditya Verma", completedTasks: 7 },
+];
+
+// ----- LEADERBOARD -----
+function Leaderboard() {
+  const sortedLeaderboard = [...leaderboardData].sort(
+    (a, b) => b.completedTasks - a.completedTasks
+  );
+
+  return (
+    <section className="section" style={{ maxWidth: "640px", margin: "0 auto", paddingTop: "1.5rem" }}>
+      <div style={{ marginBottom: "1.25rem" }}>
+        <h2 style={{ marginBottom: "0.25rem" }}>Leaderboard</h2>
+        <p className="muted" style={{ fontSize: "0.85rem" }}>
+          Based on tasks completed
+        </p>
+      </div>
+
+      {sortedLeaderboard.map((user, index) => (
+        <div
+          key={user.id}
+          className="card"
+          style={{
+            marginBottom: "1.25rem",          // 🔥 SPACE BETWEEN CARDS
+            padding: "1.2rem 1.4rem",          // 🔥 CARD BREATHING ROOM
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            borderLeft: index === 0 ? "3px solid var(--primary-color)" : "none"
+          }}
+        >
+          {/* LEFT SIDE */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                color: "var(--text-muted)",
+                letterSpacing: "0.05em",
+                textTransform: "uppercase"
+              }}
+            >
+              Rank #{index + 1}
+            </span>
+
+            <span
+              style={{
+                fontSize: "1rem",              // 🔥 NAME PROMINENCE
+                fontWeight: 600,
+                color: "var(--text-primary)"
+              }}
+            >
+              {user.name}
+            </span>
+          </div>
+
+          {/* RIGHT SIDE */}
+          <span
+            style={{
+              fontSize: "0.85rem",
+              color: "var(--text-muted)"
+            }}
+          >
+            {user.completedTasks} tasks
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+
 // ----- MAIN APP LAYOUT -----
 function MainApp({
   currentUser,
@@ -397,6 +494,8 @@ function MainApp({
             tasks={tasks}
           />
         )}
+
+        {view === "leaderboard" && <Leaderboard />}
       </main>
 
       {selectedTask && (
@@ -690,6 +789,7 @@ function Sidebar({ currentView, onChangeView, collapsed, onToggleCollapse }) {
     { id: "marketplace", label: "Browse Tasks", icon: FiList },
     { id: "post", label: "Post a Task", icon: FiPlusCircle },
     { id: "history", label: "History", icon: FiClock },
+    { id: "leaderboard", label: "Leaderboard", icon: FiAward },
     { id: "profile", label: "Profile / Settings", icon: FiUser },
   ];
 
@@ -751,11 +851,10 @@ function Dashboard({ tasks, currentUser, onCompleteTask, onNavigate }) {
   const acceptedByUser = tasks.filter((t) => t.acceptedBy === currentUser.id);
   const totalPosted = postedByUser.length;
   const totalAccepted = acceptedByUser.length;
-  const totalCompleted = tasks.filter(
-    (t) =>
-      t.status === "completed" &&
-      (t.acceptedBy === currentUser.id || t.createdBy === currentUser.id)
-  ).length;
+  // Calculate total earnings from completed tasks accepted by current user
+  const totalEarnings = tasks
+    .filter(t => t.status === "completed" && t.acceptedBy === currentUser.id)
+    .reduce((sum, t) => sum + t.price, 0);
   const pendingOutgoing = postedByUser.filter((t) => t.status === "open").length;
   const pendingIncoming = acceptedByUser.filter(
     (t) => t.status === "accepted"
@@ -787,8 +886,8 @@ function Dashboard({ tasks, currentUser, onCompleteTask, onNavigate }) {
           className="stat-card clickable"
           onClick={() => onNavigate("history", { completed: "true" })}
         >
-          <div className="stat-label">Tasks completed</div>
-          <div className="stat-value">{totalCompleted}</div>
+          <div className="stat-label">Total earnings</div>
+          <div className="stat-value">₹{totalEarnings}</div>
         </button>
         <button
           className="stat-card clickable"
@@ -887,6 +986,10 @@ function PostTaskForm({ onCreateTask, categories }) {
   const [price, setPrice] = useState(100);
   const [deadline, setDeadline] = useState("");
 
+  // 🔽 NEW STATE FOR ATTACHMENTS
+  const [taskFiles, setTaskFiles] = useState([]);
+  const [taskLink, setTaskLink] = useState("");
+
   const pricePresets = [50, 100, 200, 500];
 
   const handleSubmit = (e) => {
@@ -899,13 +1002,24 @@ function PostTaskForm({ onCreateTask, categories }) {
       category,
       price: Number(price),
       deadline,
+
+      // 🔽 ATTACHMENTS ADDED TO TASK OBJECT
+      attachments: {
+        files: taskFiles.map((file) => ({
+          name: file.name,
+          type: file.type,
+        })),
+        links: taskLink ? [taskLink] : [],
+      },
     });
 
+    // 🔽 RESET FORM
     setTitle("");
     setDescription("");
     setPrice(100);
     setDeadline("");
-    // Task created, user can see it in marketplace or dashboard
+    setTaskFiles([]);
+    setTaskLink("");
   };
 
   return (
@@ -985,7 +1099,9 @@ function PostTaskForm({ onCreateTask, categories }) {
                   <button
                     key={preset}
                     type="button"
-                    className={`price-preset-btn ${price == preset ? "active" : ""}`}
+                    className={`price-preset-btn ${
+                      price == preset ? "active" : ""
+                    }`}
                     onClick={() => setPrice(preset)}
                   >
                     ₹{preset}
@@ -1005,6 +1121,27 @@ function PostTaskForm({ onCreateTask, categories }) {
             />
           </label>
 
+          {/* 🔽 OPTIONAL ATTACHMENTS (NO NEW SECTION) */}
+          <label className="form-label">
+            Attach files (optional)
+            <input
+              type="file"
+              multiple
+              accept="image/*,.pdf"
+              onChange={(e) => setTaskFiles(Array.from(e.target.files))}
+            />
+          </label>
+
+          <label className="form-label">
+            Reference link (optional)
+            <input
+              type="url"
+              placeholder="https://example.com"
+              value={taskLink}
+              onChange={(e) => setTaskLink(e.target.value)}
+            />
+          </label>
+
           <button type="submit" className="primary-btn">
             Post task
           </button>
@@ -1013,6 +1150,7 @@ function PostTaskForm({ onCreateTask, categories }) {
     </section>
   );
 }
+
 
 // ----- MY ACCEPTED TASKS -----
 function MyAcceptedTasks({ tasks, currentUser, onCompleteTask, onOpenTask }) {
@@ -1082,12 +1220,81 @@ function TaskMarketplace({
   filterPrice,
   setFilterPrice,
   onAcceptTask,
-  onOpenTask,
   currentUser,
   onNavigateToMyTasks,
   searchParams,
   onClearFilters,
 }) {
+  const [selectedTask, setSelectedTask] = React.useState(null);
+
+  // ---------- TASK DETAILS VIEW ----------
+  if (selectedTask) {
+    const attachments = selectedTask.attachments || { files: [], links: [] };
+
+    return (
+      <section className="section">
+        <div className="card">
+          <h2>{selectedTask.title}</h2>
+
+          <p className="muted" style={{ marginBottom: "0.75rem" }}>
+            Posted by {selectedTask.createdByName}
+          </p>
+
+          <p>{selectedTask.description}</p>
+
+          {/* Attachments */}
+          {(attachments.files.length > 0 || attachments.links.length > 0) && (
+            <div style={{ marginTop: "1rem" }}>
+              <h4>Attachments</h4>
+
+              {attachments.files.length > 0 && (
+                <ul>
+                  {attachments.files.map((file, idx) => (
+                    <li key={idx} className="muted">
+                      {file.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {attachments.links.length > 0 && (
+                <ul>
+                  {attachments.links.map((link, idx) => (
+                    <li key={idx}>
+                      <a href={link} target="_blank" rel="noreferrer">
+                        {link}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div
+            style={{
+              marginTop: "1.5rem",
+              display: "flex",
+              justifyContent: "space-between",
+            }}
+          >
+            <button
+              className="secondary-btn"
+              onClick={() => setSelectedTask(null)}
+            >
+              Back
+            </button>
+
+            <button className="secondary-btn">
+              Chat (coming soon)
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // ---------- MARKETPLACE GRID ----------
   return (
     <section className="section">
       <div className="section-header">
@@ -1100,15 +1307,16 @@ function TaskMarketplace({
         </div>
 
         <div className="filters">
-            {searchParams?.get("view") && (
-              <button
-                className="secondary-btn small"
-                onClick={() => onClearFilters && onClearFilters()}
-                style={{ marginRight: "0.6rem" }}
-              >
-                Clear filter
-              </button>
-            )}
+          {searchParams?.get("view") && (
+            <button
+              className="secondary-btn small"
+              onClick={() => onClearFilters && onClearFilters()}
+              style={{ marginRight: "0.6rem" }}
+            >
+              Clear filter
+            </button>
+          )}
+
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
@@ -1140,56 +1348,66 @@ function TaskMarketplace({
             const isAcceptedByMe = task.acceptedBy === currentUser.id;
 
             return (
-              <article key={task.id} className="task-card">
+              <article
+                key={task.id}
+                className="task-card clickable-card"
+                onClick={() => setSelectedTask(task)}
+              >
                 <div className="task-card-header">
-                  <h3
-                    className="task-title"
-                    onClick={() => {
-                      if (isAcceptedByMe && onNavigateToMyTasks) {
-                        onNavigateToMyTasks();
-                      } else {
-                        onOpenTask(task);
-                      }
-                    }}
-                  >
-                    {task.title}
-                  </h3>
+                  <h3 className="task-title">{task.title}</h3>
+
                   <div className="task-badges">
                     {isOwnTask && (
-                      <span className="task-badge posted-by-you">Posted by you</span>
+                      <span className="task-badge posted-by-you">
+                        Posted by you
+                      </span>
                     )}
                     {isAccepted && !isOwnTask && !isAcceptedByMe && (
                       <span className="task-badge taken">Taken</span>
                     )}
                     {isAcceptedByMe && (
-                      <span className="task-badge accepted-by-me">Accepted</span>
+                      <span className="task-badge accepted-by-me">
+                        Accepted
+                      </span>
                     )}
                   </div>
                 </div>
+
                 <p className="task-description">
                   {task.description.slice(0, 120)}
                   {task.description.length > 120 ? "…" : ""}
                 </p>
+
                 <div className="task-meta">
                   <span className="pill">{task.category}</span>
                   <span className="pill pill-price">₹{task.price}</span>
                 </div>
+
                 <div className="task-footer">
-                  <span className="deadline">Deadline: {task.deadline}</span>
+                  <span className="deadline">
+                    Deadline: {task.deadline}
+                  </span>
+
                   {isOwnTask ? (
                     <span className="your-task-label">Your Task</span>
                   ) : isAcceptedByMe ? (
                     <button
                       className="secondary-btn small"
-                      onClick={() => onNavigateToMyTasks && onNavigateToMyTasks()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigateToMyTasks && onNavigateToMyTasks();
+                      }}
                     >
                       View in My Tasks
                     </button>
                   ) : (
                     <button
                       className="primary-btn small"
-                      onClick={() => onAcceptTask(task.id)}
                       disabled={isAccepted}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAcceptTask(task.id);
+                      }}
                     >
                       {isAccepted ? "Already accepted" : "Accept task"}
                     </button>
@@ -1204,57 +1422,113 @@ function TaskMarketplace({
   );
 }
 
+// ----- GENERIC TASK CARD (USED IN HISTORY) -----
+function TaskCard({ task, currentUser }) {
+  const isPostedByMe = task.createdBy === currentUser.id;
+  const isCompleted = task.status === "completed";
+
+  return (
+    <article className="task-card">
+      <div className="task-card-header">
+        <h3 className="task-title">{task.title}</h3>
+
+        <span className={`status-pill status-${task.status}`}>
+          {isCompleted ? "Completed" : task.status}
+        </span>
+      </div>
+
+      <p className="task-description">
+        {task.description.slice(0, 120)}
+        {task.description.length > 120 ? "…" : ""}
+      </p>
+
+      <div className="task-meta">
+        <span className="pill">{task.category}</span>
+        <span className="pill pill-price">₹{task.price}</span>
+      </div>
+
+      <div className="task-footer">
+        <span className="deadline">Deadline: {task.deadline}</span>
+        <span className="muted" style={{ fontSize: "0.8rem" }}>
+          {isPostedByMe
+            ? "Posted by you"
+            : `Accepted by ${task.acceptedByName || "another student"}`}
+        </span>
+      </div>
+    </article>
+  );
+}
+
 // ----- HISTORY -----
 function History({ tasks, currentUser, searchParams }) {
   // Filter to show only completed tasks if filter is set
   const showCompletedOnly = searchParams?.get("completed") === "true";
   
-  const completedAccepted = tasks.filter(
-    (t) => t.status === "completed" && t.acceptedBy === currentUser.id
-  );
-  const completedPosted = tasks.filter(
-    (t) => t.status === "completed" && t.createdBy === currentUser.id
-  );
-  const allCompleted = [...completedAccepted, ...completedPosted].sort(
-    (a, b) => b.id - a.id
-  );
+  // Get all relevant tasks
+  const allTasks = showCompletedOnly 
+    ? tasks.filter(t => t.status === "completed") 
+    : [...tasks];
+
+  // Tasks posted by current user
+  const postedTasks = allTasks
+    .filter(t => t.createdBy === currentUser.id)
+    .sort((a, b) => b.id - a.id);
+
+  // Tasks completed by current user
+  const completedTasks = allTasks
+    .filter(t => t.status === "completed" && t.acceptedBy === currentUser.id)
+    .sort((a, b) => b.id - a.id);
+
+  // Summary statistics
+  const tasksPosted = postedTasks.length;
+  const tasksCompleted = completedTasks.length;
 
   return (
     <section className="section">
       <h2>History</h2>
-      <p className="muted">
-        {showCompletedOnly
-          ? "Completed tasks you accepted and posted."
-          : "All completed tasks you accepted and posted."}
-      </p>
-
-      {allCompleted.length === 0 ? (
-        <p className="muted">No completed tasks yet.</p>
-      ) : (
-        <div className="task-grid">
-          {allCompleted.map((task) => (
-            <article key={task.id} className="task-card">
-              <div className="dashboard-task-header">
-                <h3>{task.title}</h3>
-                <span className="status-pill status-completed">Completed</span>
-              </div>
-              <p className="task-description">{task.description}</p>
-              <div className="task-meta">
-                <span className="pill">{task.category}</span>
-                <span className="pill pill-price">₹{task.price}</span>
-              </div>
-              <div className="task-footer">
-                <span className="deadline">Deadline: {task.deadline}</span>
-                <span className="muted">
-                  {task.acceptedBy === currentUser.id
-                    ? `Posted by ${task.createdByName}`
-                    : `Accepted by ${task.acceptedByName}`}
-                </span>
-              </div>
-            </article>
-          ))}
+      
+      {/* Summary Row */}
+      <div className="stats-row" style={{ marginBottom: '2rem' }}>
+        <div className="stat-card" style={{ flex: 'none', width: 'auto' }}>
+          <div className="stat-label">Tasks Posted</div>
+          <div className="stat-value">{tasksPosted}</div>
         </div>
-      )}
+        <div className="stat-card" style={{ flex: 'none', width: 'auto', marginLeft: '1rem' }}>
+          <div className="stat-label">Tasks Completed</div>
+          <div className="stat-value">{tasksCompleted}</div>
+        </div>
+      </div>
+
+      {/* Two-column layout */}
+      <div style={{ display: 'flex', gap: '2rem', marginTop: '1rem' }}>
+        {/* Left Column: Tasks Posted */}
+        <div style={{ flex: 1 }}>
+          <h3 style={{ marginBottom: '1rem' }}>Tasks You Posted</h3>
+          {postedTasks.length > 0 ? (
+            <div className="task-grid">
+              {postedTasks.map(task => (
+                <TaskCard key={task.id} task={task} currentUser={currentUser} />
+              ))}
+            </div>
+          ) : (
+            <p className="muted">No tasks posted yet.</p>
+          )}
+        </div>
+
+        {/* Right Column: Tasks Completed */}
+        <div style={{ flex: 1 }}>
+          <h3 style={{ marginBottom: '1rem' }}>Tasks You Completed</h3>
+          {completedTasks.length > 0 ? (
+            <div className="task-grid">
+              {completedTasks.map(task => (
+                <TaskCard key={task.id} task={task} currentUser={currentUser} />
+              ))}
+            </div>
+          ) : (
+            <p className="muted">No tasks completed yet.</p>
+          )}
+        </div>
+      </div>
     </section>
   );
 }
